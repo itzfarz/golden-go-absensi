@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Golden Go - Staff Absensi</title>
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #111827;
+      --accent-neon: #00ffcc;
+      --accent-glow: rgba(0, 255, 204, 0.4);
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+      --danger-color: #ff3366;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .header { text-align: center; }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      color: var(--accent-neon);
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .status-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .open { background: rgba(0, 255, 204, 0.1); color: var(--accent-neon); border: 1px solid var(--accent-neon); }
+    .closed { background: rgba(255, 51, 102, 0.1); color: var(--danger-color); border: 1px solid var(--danger-color); }
+
+    .form-group {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label { font-size: 13px; color: var(--text-sub); }
+
+    input, select, textarea {
+      background: #1f2937;
+      border: 1px solid #374151;
+      padding: 12px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    input:focus, select:focus, textarea:focus { border-color: var(--accent-neon); }
+
+    textarea { resize: vertical; min-height: 70px; }
+
+    .btn-submit {
+      margin-top: 15px;
+      background: var(--accent-neon);
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--accent-glow);
+      transition: 0.2s;
+    }
+
+    .btn-submit:disabled {
+      background: #374151;
+      color: #6b7280;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .loading-text {
+      font-size: 12px;
+      color: var(--accent-neon);
+      text-align: center;
+      display: none;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <h1>GOLDEN GO STAFF ABSENSI</h1>
+      <div id="statusBadge" class="status-badge closed">Memeriksa Jam...</div>
+    </div>
+
+    <form id="attendanceForm" class="form-group" style="margin-top: 20px;">
+      <div class="form-group">
+        <label>Nama Staf</label>
+        <input type="text" id="staffName" placeholder="Masukkan nama kamu..." required>
+      </div>
+
+      <div class="form-group">
+        <label>Rank / Jabatan</label>
+        <select id="staffRole" required>
+          <option value="" disabled selected>Pilih rank kamu...</option>
+          <option value="Manager">Manager</option>
+          <option value="Admin">Admin</option>
+          <option value="Helper">Helper</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Keterangan / Kegiatan Shift Ini</label>
+        <textarea id="staffKeterangan" placeholder="Tuliskan tugas atau rencana kegiatan hari ini..." required></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-submit" disabled>CLOCK IN (ABSEN)</button>
+      <div id="loadingText" class="loading-text">Mengirim absensi...</div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // PASTE URL DARI SHEETDB DI SINI:
+  const SHEETDB_URL = "PASANG_URL_SHEETDB_DI_SINI";
+
+  const START_HOUR = 18;
+  const END_HOUR = 23;
+
+  const statusBadge = document.getElementById('statusBadge');
+  const submitBtn = document.getElementById('submitBtn');
+  const attendanceForm = document.getElementById('attendanceForm');
+  const loadingText = document.getElementById('loadingText');
+
+  function checkOperationalHours() {
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const wibHours = (utcHours + 7) % 24;
+
+    const isOpen = wibHours >= START_HOUR && wibHours < END_HOUR;
+
+    if (isOpen) {
+      statusBadge.textContent = "SYSTEM OPEN (18:00 - 23:00 WIB)";
+      statusBadge.className = "status-badge open";
+      submitBtn.disabled = false;
+    } else {
+      statusBadge.textContent = "SYSTEM CLOSED (Tutup Jam 23:00 WIB)";
+      statusBadge.className = "status-badge closed";
+      submitBtn.disabled = true;
+    }
+  }
+
+  attendanceForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (SHEETDB_URL === "https://sheetdb.io/api/v1/u9e3ixbvlroh7") {
+      alert("Masukkan link SheetDB kamu dulu di kodenya!");
+      return;
+    }
+
+    const name = document.getElementById('staffName').value;
+    const role = document.getElementById('staffRole').value;
+    const keterangan = document.getElementById('staffKeterangan').value;
+    
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) + " WIB";
+
+    submitBtn.disabled = true;
+    loadingText.style.display = "block";
+
+    fetch(SHEETDB_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [{
+          time: timeString,
+          name: name,
+          role: role,
+          status: "HADIR",
+          keterangan: keterangan
+        }]
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      loadingText.style.display = "none";
+      alert(`Absensi Berhasil!\nNama: ${name}\nRank: ${role}\nStatus: HADIR (${timeString})`);
+      attendanceForm.reset();
+      checkOperationalHours();
+    })
+    .catch(error => {
+      loadingText.style.display = "none";
+      alert("Gagal koneksi. Coba lagi!");
+      submitBtn.disabled = false;
+    });
+  });
+
+  checkOperationalHours();
+  setInterval(checkOperationalHours, 60000);
+</script>
+
+</body>
+</html>
